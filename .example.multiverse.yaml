@@ -1,0 +1,14 @@
+global:
+  MY_GLOBAL_ENV1: value1
+  MY_GLOBAL_ENV2: value2
+
+environments:
+  - name: prod
+    envs:
+      MY_ENV_A: valueA
+      MY_ENV_B: valueB
+
+  - name: sandbox
+    envs:
+      MY_ENV_A: valueC
+      MY_ENV_B: valueD
