@@ -21,6 +21,18 @@ go run . list --config .example.multiverse.yaml
 `--config .example.multiverse.yaml` (or `MULTIVERSE_CONFIG=`) is how to exercise the tool in-repo
 without a config in `$HOME`.
 
+Nothing under `cmd/` is unit-tested, so anything touching the shell contract needs checking by hand
+in a throwaway bash:
+
+```bash
+go build && export MULTIVERSE_CONFIG=$PWD/.example.multiverse.yaml
+bash -c 'eval "$(./multiverse init bash)"; before=$PATH
+         multiverse use prod; multiverse use prod   # must be idempotent: PATH grows once
+         multiverse use sandbox; multiverse off
+         [ "$PATH" = "$before" ] && echo restored'
+./multiverse export --shell bash use prod 2>/dev/null   # stdout must be pure bash
+```
+
 ## The central constraint
 
 A child process cannot modify its parent shell's environment. `use` and `off` therefore do **not**
@@ -34,9 +46,16 @@ errors go to stderr via `warnf` (`cmd/root.go`) or by returning an error from a 
 executed by the user's shell. The whole script is built in a `shell.Script` buffer and written only
 after `sc.Err()` comes back nil, so a failed run emits nothing at all.
 
-`cmd/use.go` and `cmd/off.go` are deliberately non-functional stubs: when the binary is reached
-directly it means the integration is missing (or was bypassed), and they explain which. The real
-work is in the hidden `export` command.
+`cmd/use.go` holds `useCmd` and `offCmd`, both deliberately non-functional stubs: reaching the binary
+directly means the integration is missing, or was bypassed, and they explain which (told apart by the
+`MULTIVERSE_SHELL_INTEGRATION` marker the template exports). The real work is in the hidden `export`
+command.
+
+**Adding a subcommand that changes the environment means editing two files.** The generated function
+dispatches on a hard-coded list — `case "$1" in use|off)` in `internal/shell/bash.go` — and forwards
+`"$@"` after `export --shell bash`, so `export`'s first positional argument is the action name. A new
+mutating command that is not added to that list silently reaches the plain binary and does nothing at
+all, which is the quietest possible failure.
 
 ## Architecture
 
@@ -75,3 +94,8 @@ give different answers on different runs.
 - Config loading is lazy, called from the commands that need it, so `init` and `--help` work on a
   machine with no config file.
 - Only bash is supported; `--shell` and `init <shell>` reject anything else rather than guessing.
+- The flag variables `omitGlobal` and `envAlias` are declared once in `cmd/export.go` and bound by
+  several commands (`export`, `use`, and `omitGlobal` again by `status`). That is safe only because
+  exactly one command runs per process — do not read them outside a `RunE`.
+- `universeName` (`cmd/export.go`) takes the universe from the positional argument and falls back to
+  the older `-e/--env` flag, which is kept working for muscle memory from the `apply -e prod` days.
