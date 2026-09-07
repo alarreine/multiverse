@@ -2,77 +2,130 @@
 
 Welcome to **Multiverse**, the command-line tool that's not just a tool, but a portal to effortlessly navigate through the vast landscapes of environment configurations. Think of it as your trusty time machine, zipping you between parallel worlds of development, testing, and production.
 
+```bash
+$ multiverse use prod
+universe: prod (8 vars)
+$ echo $API_URL
+https://eu.api.example.com          # applied right here, in this shell
+$ multiverse off
+universe: none (left prod)
+$ echo $API_URL
+                                    # and cleanly undone
+```
+
 ## Inspiration
-Multiverse draws creative inspiration from the powerful simplicity of [direnv](https://direnv.net/), a pioneering tool in the realm of environment switching. We owe a cosmic hat tip to [direnv](https://direnv.net/) for lighting the path and showing us the vast potential of environment management. While Multiverse embarks on its own interstellar journey, we acknowledge the groundbreaking work done by [direnv](https://direnv.net/) and hope to complement it in the universe of environment configuration tools.
+Multiverse draws creative inspiration from the powerful simplicity of [direnv](https://direnv.net/), a pioneering tool in the realm of environment switching. We owe a cosmic hat tip to [direnv](https://direnv.net/) for lighting the path and showing us the vast potential of environment management. Where direnv follows your *directory*, Multiverse follows your *intent*: universes are named, and you enter one wherever you happen to be standing.
 
 ## Features
 
 - 🌌 **Navigate Through Configurations**: Like jumping through different realities, switch between your environments with ease.
-- 🚀 **Temporal Precision**: Apply configurations for your current session, or make them permanent for future explorations.
-- 🧙‍♂️ **Magical Incantations**: With `--persist`, you can make your settings echo through time and space, persisting them into the `.envrc` of your home directory.
-- 🤫 **Whisper Mode**: Activate with --quiet to mute the chatter, and enjoy the quiet cosmos while navigating your configurations.
+- 🪄 **Applied Where You Stand**: `use` and `off` change the shell you are typing in — no `source <(...)`, no subshell, no new terminal.
+- ↩️ **Nothing Left Behind**: `off` puts back the values that were there before and unsets the ones the universe invented. Your `PATH` survives.
+- 🧬 **Inheritance and Interpolation**: universes can `extend` one another, and values can refer to other values with `$VAR`.
+- 🤫 **Whisper Mode**: Activate with `--quiet` to mute the chatter, and enjoy the quiet cosmos while navigating your configurations.
 
 ## Installation
 
 Grab your universal translator (aka your terminal) and type the ancient runes:
 
 ```bash
-# Replace with actual installation instructions
 git clone git@github.com:alarreine/multiverse.git
 cd multiverse
 go build
+sudo install multiverse /usr/local/bin/     # or put it anywhere on your PATH
 ```
 
-After building Multiverse, you have a couple of options to ensure it's always within your arm's reach:
+### Install the shell integration
 
-1. Add Multiverse to Your PATH:
-
-Edit your shell's configuration file (like .bashrc or .zshrc) and append the path to the Multiverse binary. Replace /path/to/multiverse with the actual path to the binary:
+This step is not optional, and here is why: no program can reach into the shell
+that launched it and change its variables. What Multiverse does instead is print
+the shell code and let a small bash function evaluate it for you. Add this to
+your `~/.bashrc`:
 
 ```bash
-export PATH="$PATH:/path/to/multiverse"
+eval "$(multiverse init bash)"
 ```
 
-2. Install Multiverse Globally:
+Open a new terminal, and `multiverse use` starts working on the spot. Only bash
+is supported today.
 
-For more universal access, you can install Multiverse in a common directory like /usr/local/bin. This might require superuser access:
+If you would rather not install anything, `export` is the same thing with the
+seams showing:
 
 ```bash
-sudo install multiverse /usr/local/bin/
+eval "$(multiverse export --shell bash use prod)"
 ```
 
-Now, with the power of Multiverse at your fingertips, you're ready to navigate the cosmic seas of configuration!
+## Configuration
+
+Multiverse reads the first file it finds, in this order:
+
+1. `--config <path>`
+2. `$MULTIVERSE_CONFIG`
+3. `~/.config/multiverse/config.yaml`
+4. `~/.multiverse.yaml`
+
+See [`.example.multiverse.yaml`](.example.multiverse.yaml):
+
+```yaml
+global:                       # applied on top of every universe
+  MY_GLOBAL_ENV1: value1
+
+environments:
+  - name: base
+    envs:
+      TOOLS_HOME: /opt/tools
+      PATH: "${TOOLS_HOME}/bin:$PATH"
+      REGION: eu
+
+  - name: prod
+    extends: base             # inherit base, then override
+    envs:
+      API_URL: "https://${REGION}.api.example.com"
+```
+
+**Interpolation.** Values may use `$VAR` and `${VAR}`. A name is looked up among
+the universe's own variables first, then in your shell. The one exception is a
+variable that mentions itself — `PATH: "${TOOLS_HOME}/bin:$PATH"` — which always
+means the value already in your shell; that is what lets you prepend to `PATH`
+without it growing every time you run `use`. Write `$$` for a literal `$`.
+
+**Inheritance.** `extends` pulls in another universe. Precedence, lowest to
+highest: `global`, then ancestors from farthest to nearest, then the universe's
+own `envs`.
 
 ## Usage
 
 ### Global Flags
-* `--env`, `-e`: Specify the universe (environment) you wish to enter. Ideal for quickly hopping between different settings.
-* `--quiet`, `-q`: Mute the chatter, enjoy the quiet cosmos. Silence all log messages for a stealthier journey through your config multiverse.
+* `--config`: Point at a specific config file.
+* `--quiet`, `-q`: Mute the chatter, enjoy the quiet cosmos.
 
-### Apply SubCommand
-Apply the fabric of your environment settings:
+### use
+Enter a universe, right here in this shell:
 
 ```bash
-multiverse apply --env=<universe_name>
+multiverse use prod
+multiverse use prod --omit-global   # skip the global block
 ```
 
-Remember, if you use --persist, don't forget to recite the spell source $HOME/.envrc in your .bashrc scrolls.
+Running it again is a no-op, and switching straight to another universe cleans up
+the first one on the way.
 
-### Check SubCommand
+### off
+Leave the current universe. Variables that existed before you arrived go back to
+their previous values; the ones the universe introduced are unset.
+
+```bash
+multiverse off
+```
+
+### status
 Peer into the cosmic map of your environment variables:
 
 ```bash
-multiverse check
+multiverse status        # which universe am I in?
+multiverse status -v     # ...and does my shell actually match it?
 ```
-
-### List SubCommand
-Take a galactic tour of all available environments:
-
-```bash
-multiverse list
-```
-
-Get an overview of all the mystical environments within your multiverse.yaml, like stars shining in the night sky.
 
 #### This command conjures mystical symbols:
 
@@ -80,11 +133,27 @@ Get an overview of all the mystical environments within your multiverse.yaml, li
 ✗: Venturing into unknown territories.
 !=: Parallel dimensions detected!
 
+### list
+Take a galactic tour of all available environments, with the one you currently
+inhabit marked by a `*`:
+
+```bash
+multiverse list
+```
+
+### init
+Print the bash integration described above.
+
+```bash
+multiverse init bash
+```
+
 ## Contributing to the Multiverse
 Interested in shaping the cosmos? Pull requests are the wormholes we love! Jump in and let's explore new realms of possibilities together.
 
+```bash
+go build && go test ./...
+```
+
 ## License
 Crafted by @alarreine. Licensed under MIT - the license of the cosmic explorers!
-
-
-

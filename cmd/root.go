@@ -25,118 +25,64 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/alarreine/multiverse/internal/config"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
-type Environment struct {
-	Name string            `yaml:"name"`
-	Envs map[string]string `yaml:"envs"`
-}
-
-type Config struct {
-	Global       map[string]string `yaml:"global"`
-	Environments []Environment     `yaml:"environments"`
-}
-
-var cfgFile string
 var (
-	envCfg         Config
-	loggingEnabled bool
+	cfgFile string
+	quiet   bool
 )
 
 var rootCmd = &cobra.Command{
 	Use:   "multiverse",
 	Short: "Manage environment configurations effortlessly",
-	Long: `Welcome to Multiverse, the command-line tool that's your portal to effortlessly 
-navigating through the vast landscapes of environment configurations. Think of it as your 
-trusty time machine, capable of zipping you between parallel worlds of development, testing, and production. 
+	Long: `Welcome to Multiverse, the command-line tool that's your portal to effortlessly
+navigating through the vast landscapes of environment configurations. Think of it as your
+trusty time machine, capable of zipping you between parallel worlds of development, testing,
+and production.
 
-But beware, traveler! Just like in any time-travel adventure, there are rules: changes you make are 
-like altering timelines – they affect the future (your child processes) but can't rewrite the past (your parent shell). 
+  multiverse use prod     enter a universe in this very shell
+  multiverse off          leave it, putting back what was there before
+  multiverse status       where in the multiverse am I?
+  multiverse list         which universes exist?
 
-If you choose the path of persistence with the --persist flag, don't forget to inscribe 
-the magical incantation 'source $HOME/.envrc' in your sacred .bashrc scrolls. This ensures your 
-environment settings resonate across the echoes of every new terminal portal you open.
-Ready your gear, set your coordinates, and enjoy the multiverse hopping!
+'use' and 'off' reach into your current shell, and no program can do that to its
+parent on its own. The trick is a small bash function that evaluates what this
+binary prints. Install it once:
 
-Remember, with great power comes great responsibility - use your newfound abilities wisely!`,
+    eval "$(multiverse init bash)"      # in your ~/.bashrc
+
+Ready your gear, set your coordinates, and enjoy the multiverse hopping!`,
+	SilenceUsage:  true,
+	SilenceErrors: true,
 }
 
 func Execute() {
-	err := rootCmd.Execute()
-	if err != nil {
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Fprintf(os.Stderr, "multiverse: %v\n", err)
 		os.Exit(1)
 	}
 }
 
 func init() {
-	cobra.OnInitialize(initConfig)
-
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.multiverse.yaml)")
-	rootCmd.PersistentFlags().StringP("env", "e", "", "Set the environment of this envName")
-	rootCmd.PersistentFlags().BoolVarP(&loggingEnabled, "quiet", "q", false, "Mute the chatter, enjoy the quiet cosmos")
-
-	viper.BindPFlag("env", rootCmd.PersistentFlags().Lookup("env"))
-
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "",
+		"config file (default: $MULTIVERSE_CONFIG, ~/.config/multiverse/config.yaml, ~/.multiverse.yaml)")
+	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false,
+		"Mute the chatter, enjoy the quiet cosmos")
 }
 
-// initConfig reads in config file and ENV variables if set.
-func initConfig() {
-	if cfgFile != "" {
-		// Use config file from the flag.
-		viper.SetConfigFile(cfgFile)
-	} else {
-		// Find home directory.
-		home, err := os.UserHomeDir()
-		cobra.CheckErr(err)
-
-		// Search config in home directory with name ".multiverse" (without extension).
-		viper.AddConfigPath(home)
-		viper.SetConfigType("yaml")
-		viper.SetConfigName(".multiverse")
+// warnf reports progress to stderr. Nothing but evaluable bash may go to
+// stdout: the shell integration feeds stdout straight to eval.
+func warnf(format string, a ...any) {
+	if quiet {
+		return
 	}
-
-	viper.AutomaticEnv() // read in environment variables that match
-
-	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err == nil {
-		logPrintf("#using config file: %s\n", viper.ConfigFileUsed())
-	} else {
-		panic("error reading config file: %s")
-	}
-
-	if err := viper.Unmarshal(&envCfg); err != nil {
-		panic("error reading config file: %s")
-	}
+	fmt.Fprintf(os.Stderr, format+"\n", a...)
 }
 
-func getConfigEnvs() (map[string]string, error) {
-	envVars := make(map[string]string)
-	found := false
-
-	if !viper.GetBool("omit-global") {
-		envVars = envCfg.Global
-	}
-
-	for _, universe := range envCfg.Environments {
-		if universe.Name == viper.GetString("env") {
-			for key, value := range universe.Envs {
-				envVars[key] = value
-			}
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		return envVars, fmt.Errorf("#environment %s not found in config file", viper.GetString("env"))
-	}
-	return envVars, nil
-}
-
-func logPrintf(format string, a ...any) {
-	if !loggingEnabled {
-		fmt.Printf(format, a...)
-	}
+// loadConfig reads the config file. It is called from the commands that need
+// one, so that `init` and `--help` still work on a machine with no config yet.
+func loadConfig() (*config.Config, error) {
+	return config.Load(cfgFile)
 }

@@ -1,14 +1,33 @@
+# Copy to ~/.config/multiverse/config.yaml (or ~/.multiverse.yaml).
+
+# Applied on top of every universe. Skip it with: multiverse use <name> --omit-global
 global:
   MY_GLOBAL_ENV1: value1
   MY_GLOBAL_ENV2: value2
 
 environments:
+  # Values may reference other variables with $VAR or ${VAR}. Names are looked
+  # up in the same universe first, then in the shell you are in. Use $$ for a
+  # literal dollar sign.
+  - name: base
+    envs:
+      TOOLS_HOME: /opt/tools
+      PATH: "${TOOLS_HOME}/bin:$PATH" # a variable that refers to itself always
+      REGION: eu                      # means the value already in your shell
+
+  # 'extends' inherits another universe's variables; anything declared here
+  # wins over the parent, and the parent wins over global.
   - name: prod
+    extends: base
     envs:
       MY_ENV_A: valueA
       MY_ENV_B: valueB
+      API_URL: "https://${REGION}.api.example.com"
 
   - name: sandbox
+    extends: base
     envs:
+      REGION: local
       MY_ENV_A: valueC
       MY_ENV_B: valueD
+      API_URL: "https://${REGION}.api.example.com"
