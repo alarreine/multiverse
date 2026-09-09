@@ -63,7 +63,8 @@ all, which is the quietest possible failure.
 tested without a shell:
 
 - `internal/config` — parsing (strict yaml.v3, unknown keys are errors), file discovery, `Resolve`
-  (merges `global` + the `extends` chain + the universe's own `envs`), and `Interpolate`.
+  (merges `global` + the `extends` chain + the universe's own `envs`), `Interpolate`, and
+  `MatchName`/`cfg.Match` (`match.go`), the pattern filter behind `list`.
 - `internal/state` — the `MULTIVERSE_STATE` blob: JSON → gzip → base64, carried in the environment
   and inherited by the binary as a normal child process.
 - `internal/shell` — `Quote`, the `Script` builder, and the `init bash` template.
@@ -109,3 +110,10 @@ give different answers on different runs.
   exactly one command runs per process — do not read them outside a `RunE`.
 - `universeName` (`cmd/export.go`) takes the universe from the positional argument and falls back to
   the older `-e/--env` flag, which is kept working for muscle memory from the `apply -e prod` days.
+- `list`'s pattern uses **`path.Match`, never `filepath.Match`**: universe names are `/`-separated
+  regardless of OS, and `filepath.Match` switches separator on Windows. `*` deliberately does not
+  cross a `/`, which is what makes `bpm-prod/*/jenkins` select one level. `cfg.Match` returns an
+  error only for a malformed pattern; "nothing matched" is an empty slice, and `cmd/list.go` is what
+  turns that into a non-zero exit.
+- `list` without a pattern must keep printing exactly what it always has — the count line and the
+  `matching` header appear only when filtering, so existing output stays stable.

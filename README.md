@@ -141,6 +141,37 @@ inhabit marked by a `*`:
 multiverse list
 ```
 
+Give it a pattern to narrow the tour down. Without wildcards it is a
+case-insensitive substring of the universe name — the built-in version of
+`multiverse list | grep bonita`, except it matches the name rather than the
+whole line:
+
+```bash
+multiverse list bonita
+```
+
+With `*`, `?` or `[` it is a glob over the whole name. `*` does not cross a
+`/`, so you can pick one level of the hierarchy at a time:
+
+```bash
+multiverse list 'bpm-prod/*/jenkins'    # the jenkins of one account
+multiverse list '*/*/production'        # every production namespace
+multiverse list 'bonita[12]/*'          # character classes work too
+```
+
+```console
+$ multiverse list 'bpm-prod/*/jenkins'
+Universes matching "bpm-prod/*/jenkins" (/home/you/.config/multiverse/config.yaml):
+   bpm-prod/anahuac1/jenkins  (extends bpm-prod/anahuac1)
+   bpm-prod/bonita1/jenkins  (extends bpm-prod/bonita1)
+   bpm-prod/icade/jenkins  (extends bpm-prod/icade)
+
+3 of 65 universes
+```
+
+A pattern that matches nothing exits non-zero, like grep, so it behaves in a
+script. A malformed glob is reported as such rather than as an empty result.
+
 ### lint-config
 Check every universe the way `use` would, without touching your environment.
 Useful once a config grows past the point where you visit every universe.
