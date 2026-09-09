@@ -67,6 +67,8 @@ tested without a shell:
 - `internal/state` — the `MULTIVERSE_STATE` blob: JSON → gzip → base64, carried in the environment
   and inherited by the binary as a normal child process.
 - `internal/shell` — `Quote`, the `Script` builder, and the `init bash` template.
+- `internal/lint` — the checks behind `lint-config`: dry-runs everything `use` would do (resolve,
+  validate names, interpolate) over every universe, and reports `Finding`s.
 
 `cmd/export.go` is where it all comes together and is the file to read first.
 
@@ -88,7 +90,15 @@ give different answers on different runs.
 - Variable names are emitted **unquoted** into bash, so `shell.ValidName` gates every one of them —
   it is an injection boundary, not a nicety. Values are safe by construction via `shell.Quote`.
 - Names starting with `MULTIVERSE_` are rejected in config: a universe that could set the state blob
-  would corrupt the record of what to undo.
+  would corrupt the record of what to undo. `state.IsReserved` / `state.EnvPrefix` is the single
+  source of truth, used by both `cmd/export.go` and `internal/lint`.
+- **`internal/lint` detects references that expand to nothing without any hook in
+  `internal/config`.** `config.Lookup` returns `(string, bool)` and `Interpolate` consults it only
+  for names the universe does not define, so wrapping it and recording the `false` results is
+  exactly "defined nowhere". `referencedBy` names the offending keys with `os.Expand` rather than a
+  regexp, so that parser cannot drift from the one `Interpolate` uses.
+- A checker that adds findings per universe must stop after an unresolvable `extends` chain;
+  otherwise every consequence of the cycle is reported as its own problem.
 - `state.Var.Had` is the difference between restoring a value and unsetting it. Dropping it would
   make `off` on a universe that sets `PATH` leave the shell without one.
 - Config loading is lazy, called from the commands that need it, so `init` and `--help` work on a

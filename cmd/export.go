@@ -14,10 +14,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// reservedPrefix guards the bookkeeping variables: letting a universe set them
-// would corrupt the record of what to undo.
-const reservedPrefix = "MULTIVERSE_"
-
 var (
 	exportShell string
 	omitGlobal  bool
@@ -121,8 +117,8 @@ func enter(sc *shell.Script, name string, prev state.State) (int, error) {
 		return 0, err
 	}
 	for _, key := range config.SortedKeys(raw) {
-		if strings.HasPrefix(key, reservedPrefix) {
-			return 0, fmt.Errorf("universe %q sets %s, but names starting with %s are reserved", name, key, reservedPrefix)
+		if state.IsReserved(key) {
+			return 0, fmt.Errorf("universe %q sets %s, but names starting with %s are reserved", name, key, state.EnvPrefix)
 		}
 	}
 

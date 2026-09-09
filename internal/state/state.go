@@ -13,13 +13,22 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strings"
 )
+
+// EnvPrefix is the namespace multiverse keeps for its own bookkeeping.
+const EnvPrefix = "MULTIVERSE_"
 
 // Names of the two variables the shell integration carries.
 const (
-	EnvState    = "MULTIVERSE_STATE"    // opaque blob, this package's business
-	EnvUniverse = "MULTIVERSE_UNIVERSE" // human readable, for status and prompts
+	EnvState    = EnvPrefix + "STATE"    // opaque blob, this package's business
+	EnvUniverse = EnvPrefix + "UNIVERSE" // human readable, for status and prompts
 )
+
+// IsReserved reports whether a name belongs to multiverse's own namespace. A
+// universe that could set one of these would corrupt the record of what to
+// undo, so config values under the prefix are refused.
+func IsReserved(name string) bool { return strings.HasPrefix(name, EnvPrefix) }
 
 // Var records what a variable looked like before multiverse touched it. Had is
 // false when the variable did not exist, which is the difference between

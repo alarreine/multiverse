@@ -104,3 +104,18 @@ func TestKeysAreSorted(t *testing.T) {
 		t.Errorf("Keys() = %q, want %q", got, "A,B,C")
 	}
 }
+
+func TestIsReserved(t *testing.T) {
+	// The two variables this package carries must be covered by the prefix, or
+	// a universe could overwrite the record of what to undo.
+	for _, name := range []string{EnvState, EnvUniverse, EnvPrefix + "ANYTHING", "MULTIVERSE_SHELL_INTEGRATION"} {
+		if !IsReserved(name) {
+			t.Errorf("IsReserved(%q) = false, want true", name)
+		}
+	}
+	for _, name := range []string{"PATH", "AWS_PROFILE", "MULTIVERSE", "MY_MULTIVERSE_VAR", ""} {
+		if IsReserved(name) {
+			t.Errorf("IsReserved(%q) = true, want false", name)
+		}
+	}
+}

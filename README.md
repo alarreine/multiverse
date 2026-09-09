@@ -141,6 +141,34 @@ inhabit marked by a `*`:
 multiverse list
 ```
 
+### lint-config
+Check every universe the way `use` would, without touching your environment.
+Useful once a config grows past the point where you visit every universe.
+
+```bash
+multiverse lint-config                    # the config it would otherwise use
+multiverse lint-config candidate.yaml     # a file before you install it
+multiverse lint-config --strict           # warnings count as errors too
+```
+
+Errors mean a universe cannot be used at all — a cycle in `extends` or in
+interpolation, a variable name bash cannot take, a variable under the reserved
+`MULTIVERSE_` prefix. Warnings mean it works but probably does not do what you
+meant: a value referring to a name nothing defines expands to the empty string
+in silence, which is how a typo hides.
+
+```console
+$ multiverse lint-config
+config: /home/you/.config/multiverse/config.yaml
+
+prod: warning: $REGIN is defined neither by this universe nor by the environment, so it expands to nothing (used by API_URL)
+
+12 universes, 0 errors, 1 warning
+```
+
+It exits non-zero when there are errors, so it works from a pre-commit hook or
+from CI. `--quiet` drops the report and leaves just the exit code.
+
 ### init
 Print the bash integration described above.
 
